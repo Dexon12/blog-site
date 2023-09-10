@@ -5,9 +5,11 @@ from django.views.generic import ListView
 from django.core.mail import send_mail
 from django.views.decorators.http import require_POST
 from django.db.models import Count
-from django.contrib.postgres.search import SearchVector
+from django.contrib.postgres.search import SearchVector, SearchQuery, SearchRank
+from django.contrib.postgres.search import TrigramSimilarity
+from django.db.models import Q
 
-from .models import Post,Comment
+from .models import Post, Comment
 from .forms import EmailPostForm, CommentForm, SearchForm
 from taggit.models import Tag
 
@@ -109,12 +111,37 @@ def post_search(request):
     query = None
     results = []
 
-    if 'query' in request.GET: # Почему query строковое значение? Почему метод Get а не Post как передаються данные из формы?
+    # Simple version
+
+    # if 'query' in request.GET: # Почему query строковое значение? Почему метод Get а не Post как передаються данные из формы?
+    #     form = SearchForm(request.GET)
+    #     if form.is_valid():
+    #         query = form.cleaned_data['query']
+    #         search_vector=SearchVector('title', config='russian', weight='A')+SearchVector('body', weight='B')
+    #         search_query=SearchQuery(query, config='russian')
+    #         results = Post.published.annotate(
+    #             search=search_vector,
+    #             rank=SearchRank(search_vector, search_query)
+    #         ).filter(rank__gte=0.3).order_by('-rank')
+
+    # Book version
+
+        # if 'query' in request.GET:
+    #     form = SearchForm(request.GET)
+    #     if form.is_valid():
+    #             query = form.cleaned_data['query']
+    #             results = Post.published.annotate(
+    #             similarity=TrigramSimilarity('title', query),
+    #             ).filter(similarity__gt=0.1).order_by('-similarity')
+
+    # My version 
+    if 'query' in request.GET:
         form = SearchForm(request.GET)
         if form.is_valid():
             query = form.cleaned_data['query']
             results = Post.published.annotate(
-                search=SearchVector('title', 'body'),
-            ).filter(search=query)
+                similarity=TrigramSimilarity('title', query, config='russian') + TrigramSimilarity('body', query, config='russian'),  # Можно ли так делать?
+            ).filter(similarity__gt=0.1).order_by('-similarity')
+            
     return render(request, 'blog/post/search.html', {'form': form, 'query': query, 'results': results})
     

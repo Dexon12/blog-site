@@ -18,6 +18,7 @@
                 </a>
             </h4>
             {{ post.body|markdown|truncatewords_html:12 }}
+            <hr>
         {% empty %}
             <p>There are no results for your query.</p>
         {% endfor %}
